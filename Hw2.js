@@ -78,8 +78,8 @@ function render() {
     if (keycurr['ArrowLeft']) coorx -= 0.01;
     if (keycurr['ArrowRight']) coorx += 0.01;
     //range out
-    coorx = Math.max(-1.0, Math.min(1.0, coorx) );
-    coory = Math.max(-1.0, Math.min(1.0, coory) );
+    coorx = Math.max(-0.9, Math.min(0.9, coorx) );
+    coory = Math.max(-0.9, Math.min(0.9, coory) );
 
     // WebGL 그리기
     gl.clear(gl.COLOR_BUFFER_BIT);
