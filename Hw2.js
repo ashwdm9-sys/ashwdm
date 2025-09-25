@@ -73,14 +73,10 @@ function setupBuffers() {
 let coorx = 0.0, coory = 0.0 ;
 
 function render() {
-    if (keycurr['ArrowUp']) 
-        coory += 0.01;
-    if (keycurr['ArrowDown']) 
-        coory -= 0.01;
-    if (keycurr['ArrowLeft']) 
-        coorx -= 0.01;
-    if (keycurr['ArrowRight']) 
-        coorx += 0.01;
+    if (keycurr['ArrowUp']) coory += 0.01;
+    if (keycurr['ArrowDown']) coory -= 0.01;
+    if (keycurr['ArrowLeft']) coorx -= 0.01;
+    if (keycurr['ArrowRight']) coorx += 0.01;
     //range out
     coorx = Math.max(-1.0, Math.min(1.0, coorx) );
     coory = Math.max(-1.0, Math.min(1.0, coory) );
