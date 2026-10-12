@@ -1,4 +1,4 @@
-import { $, el, toast, store, api, won, ago } from './common.js';
+import { $, el, toast, store, api, won, ago, noBackend } from './common.js';
 
 const PRESET_AMOUNTS = [1000, 3000, 5000, 10000];
 let config = { minDonation: 1000, maxDonation: 1000000 };
@@ -54,8 +54,9 @@ $('#donate-form').addEventListener('submit', async (event) => {
       amount: { currency: 'KRW', value: order.amount },
       orderId: order.orderId,
       orderName: order.orderName,
-      successUrl: location.origin + '/donate/success',
-      failUrl: location.origin + '/donate/fail',
+      // 토스가 이 페이지로 되돌려보내고, 쿼리 값으로 성공/실패를 구분한다
+      successUrl: location.origin + location.pathname,
+      failUrl: location.origin + location.pathname,
       customerName: name || undefined,
     });
   } catch (err) {
@@ -81,8 +82,7 @@ $('#result-again').addEventListener('click', () => {
 
 async function handleReturn() {
   const params = new URLSearchParams(location.search);
-  const path = location.pathname;
-  if (path === '/donate/success') {
+  if (params.has('paymentKey') && params.has('orderId')) {
     showResult('승인 처리 중…', '결제사에 확인하고 있습니다. 창을 닫지 마세요.');
     try {
       const done = await api('/api/donations/confirm', {
@@ -97,12 +97,12 @@ async function handleReturn() {
     } catch (err) {
       showResult('승인 실패', `${err.message} 결제가 승인되지 않았습니다.`);
     }
-  } else if (path === '/donate/fail') {
+  } else if (params.has('code') && params.has('message')) {
     const cancelled = params.get('code') === 'PAY_PROCESS_CANCELED';
     showResult(cancelled ? '결제를 취소했습니다' : '결제 실패', params.get('message') || '결제가 완료되지 않았습니다.');
   }
   // 새로고침으로 승인이 다시 요청되지 않게 주소를 정리한다
-  if (path !== '/donate') history.replaceState(null, '', '/donate');
+  if (params.size) history.replaceState(null, '', location.pathname);
 }
 
 // ---------- 명예의 전당 ----------
@@ -133,6 +133,7 @@ async function loadDonors() {
 async function init() {
   $('#donor-name').value = store.get('dgb:name') || '';
   renderAmounts();
+  if (noBackend) return toast('서버 주소가 설정되지 않았습니다. config.js 를 확인하세요.', 8000);
   try {
     config = await api('/api/config');
     $('#test-banner').hidden = config.live;

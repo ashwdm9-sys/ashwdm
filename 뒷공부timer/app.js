@@ -1,4 +1,4 @@
-import { $, el, toast, store, api, ago } from './common.js';
+import { $, el, toast, store, api, ago, API_BASE, noBackend, wsUrl } from './common.js';
 
 const PRESETS = ['공부 그만!!', '책 덮어라', '너 지금 공부하지?', '배신자 색출 중', 'PC방 ㄱ?', '떡볶이 사라', '다 보인다', '형광펜 내려놔'];
 const DEFAULT_ALIBI = '릴스 넘기는 중';
@@ -41,7 +41,7 @@ function showLobby() {
 
 function goLobby() {
   disconnect();
-  history.pushState(null, '', '/');
+  history.pushState(null, '', location.pathname);
   showLobby();
 }
 
@@ -72,7 +72,7 @@ async function route() {
   } catch (err) {
     showLobby();
     toast(err.message);
-    history.replaceState(null, '', '/');
+    history.replaceState(null, '', location.pathname);
   }
 }
 
@@ -82,7 +82,7 @@ $('#create-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     const created = await api('/api/rooms', { method: 'POST', body: { name: $('#room-name').value } });
-    history.pushState(null, '', '/?room=' + created.code);
+    history.pushState(null, '', '?room=' + created.code);
     enterRoom(created.code, created.name);
     $('#room-name').value = '';
   } catch (err) {
@@ -96,7 +96,7 @@ $('#join-form').addEventListener('submit', async (event) => {
   if (code.length !== 6) return toast('방 코드는 6자리입니다.');
   try {
     const info = await api('/api/rooms/' + encodeURIComponent(code));
-    history.pushState(null, '', '/?room=' + info.code);
+    history.pushState(null, '', '?room=' + info.code);
     enterRoom(info.code, info.name);
     $('#join-code').value = '';
   } catch (err) {
@@ -106,7 +106,12 @@ $('#join-form').addEventListener('submit', async (event) => {
 
 window.addEventListener('popstate', () => {
   disconnect();
+  if (noBackend) {
+  showLobby();
+  toast('서버 주소가 설정되지 않았습니다. config.js 를 확인하세요.', 8000);
+} else {
   route();
+}
 });
 
 // ---------- 실시간 연결 ----------
@@ -114,7 +119,7 @@ window.addEventListener('popstate', () => {
 function connect() {
   clearTimeout(retryTimer);
   const code = roomCode;
-  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  const socket = new WebSocket(wsUrl());
   ws = socket;
 
   socket.addEventListener('open', () => {
@@ -169,7 +174,7 @@ function send(msg) {
 // ---------- 방 렌더링 ----------
 
 const me = () => room?.members.find((m) => m.id === userId);
-const photoUrl = (m) => `/api/rooms/${room.code}/photo/${encodeURIComponent(m.id)}?v=${m.photoV}`;
+const photoUrl = (m) => `${API_BASE}/api/rooms/${room.code}/photo/${encodeURIComponent(m.id)}?v=${m.photoV}`;
 const sortedMembers = () => [...room.members].sort((a, b) => elapsedOf(b) - elapsedOf(a) || a.name.localeCompare(b.name, 'ko'));
 
 function renderRoom() {
@@ -445,7 +450,7 @@ $('#wanted-list').addEventListener('click', (event) => {
 // ---------- 방 헤더 ----------
 
 $('#copy-link').addEventListener('click', async () => {
-  const link = `${location.origin}/?room=${roomCode}`;
+  const link = `${location.origin}${location.pathname}?room=${roomCode}`;
   try {
     await navigator.clipboard.writeText(link);
     toast('초대 링크를 복사했습니다. 용의자에게 뿌리세요.');
@@ -460,4 +465,9 @@ $('#leave').addEventListener('click', () => {
   goLobby();
 });
 
-route();
+if (noBackend) {
+  showLobby();
+  toast('서버 주소가 설정되지 않았습니다. config.js 를 확인하세요.', 8000);
+} else {
+  route();
+}

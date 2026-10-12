@@ -36,8 +36,17 @@ export const store = {
   },
 };
 
+export const API_BASE = String(window.DGB_API_BASE || '').replace(/\/+$/, '');
+// GitHub Pages에는 서버가 없으므로 서버 주소가 비어 있으면 아무것도 동작하지 않는다
+export const noBackend = !API_BASE && location.hostname.endsWith('github.io');
+export const wsUrl = () =>
+  API_BASE
+    ? API_BASE.replace(/^http/, 'ws') + '/ws'
+    : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+
 export async function api(path, options = {}) {
-  const response = await fetch(path, {
+  if (noBackend) throw new Error('서버 주소가 설정되지 않았습니다. config.js 를 확인하세요.');
+  const response = await fetch(API_BASE + path, {
     method: options.method || 'GET',
     headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
     body: options.body ? JSON.stringify(options.body) : undefined,

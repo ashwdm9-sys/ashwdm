@@ -111,6 +111,25 @@ function publicRoom(room) {
 // ---------- HTTP ----------
 
 const app = express();
+
+// 화면을 다른 주소(GitHub Pages 등)에 올린 경우 그 주소의 요청만 허용한다. 쉼표로 여러 개 지정 가능.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://ashwdm9-sys.github.io')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.set('Vary', 'Origin');
+    if (req.method === 'OPTIONS') return res.status(204).end();
+  }
+  next();
+});
+
 app.use(express.json({ limit: '50kb' }));
 
 app.get('/api/config', (req, res) => {
@@ -231,12 +250,11 @@ app.post('/api/donations/confirm', async (req, res) => {
   }
 });
 
-const PUBLIC_DIR = path.join(__dirname, 'public');
-app.use(express.static(PUBLIC_DIR));
-// 토스 결제창이 돌아오는 주소. 같은 후원 페이지가 경로를 보고 결과를 처리한다.
-app.get(['/donate', '/donate/success', '/donate/fail'], (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, 'donate.html'));
-});
+// 로컬 실행용: 상위 폴더의 화면 파일을 같이 서빙한다. 서버 소스와 데이터는 노출하지 않는다.
+// (GitHub Pages에 화면을 올린 경우에는 쓰이지 않는다)
+const SITE_DIR = path.join(__dirname, '..');
+app.use('/server', (req, res) => res.status(404).end());
+app.use(express.static(SITE_DIR));
 
 // ---------- WebSocket (방 실시간 동기화) ----------
 
