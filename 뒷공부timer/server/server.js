@@ -155,6 +155,8 @@ app.get('/api/rooms/:code/photo/:userId', (req, res) => {
   const match = /^data:image\/jpeg;base64,(.+)$/.exec(member?.photo || '');
   if (!match) return res.status(404).end();
   res.set('Content-Type', 'image/jpeg');
+  // 난장판 효과가 사진을 캔버스에서 읽어 눈 위치를 찾으므로 어느 출처에서든 읽을 수 있게 한다
+  res.set('Access-Control-Allow-Origin', '*');
   res.set('Cache-Control', 'public, max-age=31536000, immutable');
   res.send(Buffer.from(match[1], 'base64'));
 });
@@ -281,6 +283,10 @@ function broadcastState(room) {
   saveDb();
 }
 
+const CHAOS_COOLDOWN_MS = 10_000;
+/** 방 코드 -> 마지막 난장판 시각 */
+const chaosAt = new Map();
+
 // 메시지 종류별 최소 간격(ms)
 const THROTTLE = { shout: 700, report: 250, photo: 3000, rename: 300, alibi: 300, timer: 200 };
 
@@ -353,6 +359,18 @@ const handlers = {
     target.convictions += 1;
     broadcast(room, { type: 'busted', targetId: target.id, name: target.name, by: me.anon, convictions: target.convictions });
     broadcastState(room);
+  },
+
+  // 슈퍼난장판: 방 전원의 화면을 5초간 폭주시킨다
+  chaos(ws, room, me) {
+    const now = Date.now();
+    const wait = CHAOS_COOLDOWN_MS - (now - (chaosAt.get(room.code) || 0));
+    if (wait > 0) {
+      return send(ws, { type: 'error', message: `난장판은 ${Math.ceil(wait / 1000)}초 뒤에 다시 터뜨릴 수 있습니다.` });
+    }
+    chaosAt.set(room.code, now);
+    room.touchedAt = now;
+    broadcast(room, { type: 'chaos', by: me.anon, userId: me.id });
   },
 
   leave(ws, room, me) {

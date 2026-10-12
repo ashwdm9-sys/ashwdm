@@ -137,6 +137,8 @@ function connect() {
       renderRoom();
     } else if (msg.type === 'shout') {
       addShout(msg);
+    } else if (msg.type === 'chaos') {
+      startChaos(msg.by);
     } else if (msg.type === 'busted') {
       onBusted(msg);
     } else if (msg.type === 'error') {
@@ -215,7 +217,10 @@ function renderModel() {
   const src = photoUrl(model);
   if (box.dataset.src !== src) {
     box.dataset.src = src;
-    box.replaceChildren(el('img', { src, alt: `캠페인 모델 ${model.name}` }));
+    // crossOrigin 을 src 보다 먼저 줘야 난장판 효과가 사진에서 눈 위치를 읽을 수 있다
+    const img = el('img', { crossOrigin: 'anonymous', src, alt: `캠페인 모델 ${model.name}` });
+    box.replaceChildren(img);
+    window.SuperChaos?.prepare(img);
   }
   tag.hidden = false;
   tag.textContent = `캠페인 모델 ${model.name} · ${ago(room.model.at, serverNow())}`;
@@ -340,6 +345,23 @@ function onBusted(msg) {
 }
 
 $('#busted-ok').addEventListener('click', () => ($('#busted').hidden = true));
+
+// ---------- 슈퍼난장판 ----------
+
+const CHAOS_COOLDOWN_MS = 10_000; // 서버와 같은 값
+let chaosAt = 0;
+
+function startChaos(by) {
+  chaosAt = Date.now();
+  window.SuperChaos?.run({ image: $('#model img'), nick: by });
+}
+
+$('#chaos-btn').addEventListener('click', () => {
+  const wait = CHAOS_COOLDOWN_MS - (Date.now() - chaosAt);
+  if (wait > 0) return toast(`난장판은 ${Math.ceil(wait / 1000)}초 뒤에 다시 터뜨릴 수 있습니다.`);
+  // 소리는 클릭한 그 순간에 시작해야 브라우저가 막지 않으므로, 서버 응답을 기다리지 않고 바로 터뜨린다
+  if (send({ type: 'chaos' })) startChaos(me()?.anon);
+});
 
 // ---------- 한마디 던지기 ----------
 
