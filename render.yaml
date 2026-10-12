@@ -1,12 +1,12 @@
 # Render Blueprint: 뒷공부timer 서버 (화면은 GitHub Pages)
+# rootDir 은 한글 경로를 허용하지 않아서 명령어에서 폴더로 이동한다.
 services:
   - type: web
     name: dwitgongbu-timer
     runtime: node
     plan: free
-    rootDir: 뒷공부timer/server
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: cd 뒷공부timer/server && npm install
+    startCommand: cd 뒷공부timer/server && npm start
     healthCheckPath: /api/config
     envVars:
       - key: NODE_VERSION
