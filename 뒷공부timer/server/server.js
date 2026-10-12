@@ -362,7 +362,7 @@ const handlers = {
   },
 
   // 슈퍼난장판: 방 전원의 화면을 5초간 폭주시킨다
-  chaos(ws, room, me) {
+  chaos(ws, room, me, msg) {
     const now = Date.now();
     const wait = CHAOS_COOLDOWN_MS - (now - (chaosAt.get(room.code) || 0));
     if (wait > 0) {
@@ -370,7 +370,8 @@ const handlers = {
     }
     chaosAt.set(room.code, now);
     room.touchedAt = now;
-    broadcast(room, { type: 'chaos', by: me.anon, userId: me.id });
+    const mode = msg.mode === 'slap' ? 'slap' : 'fire';
+    broadcast(room, { type: 'chaos', by: me.anon, userId: me.id, mode });
   },
 
   leave(ws, room, me) {

@@ -138,7 +138,7 @@ function connect() {
     } else if (msg.type === 'shout') {
       addShout(msg);
     } else if (msg.type === 'chaos') {
-      startChaos(msg.by);
+      startChaos(msg.by, msg.mode);
     } else if (msg.type === 'busted') {
       onBusted(msg);
     } else if (msg.type === 'error') {
@@ -351,16 +351,26 @@ $('#busted-ok').addEventListener('click', () => ($('#busted').hidden = true));
 const CHAOS_COOLDOWN_MS = 10_000; // 서버와 같은 값
 let chaosAt = 0;
 
-function startChaos(by) {
+function startChaos(by, mode = 'fire') {
   chaosAt = Date.now();
-  window.SuperChaos?.run({ image: $('#model img'), nick: by });
+  window.SuperChaos?.run({
+    mode,
+    image: $('#model img'),
+    face: $('#model'), // 싸다구에 맞고 흔들리는 포스터 모델 박스
+    hand: $('.poster-hand'), // 포스터의 손이 직접 날아가 때린다
+    nick: by,
+  });
 }
 
 $('#chaos-btn').addEventListener('click', () => {
   const wait = CHAOS_COOLDOWN_MS - (Date.now() - chaosAt);
   if (wait > 0) return toast(`난장판은 ${Math.ceil(wait / 1000)}초 뒤에 다시 터뜨릴 수 있습니다.`);
-  // 소리는 클릭한 그 순간에 시작해야 브라우저가 막지 않으므로, 서버 응답을 기다리지 않고 바로 터뜨린다
-  if (send({ type: 'chaos' })) startChaos(me()?.anon);
+  // 소리는 클릭한 순간에 시작해야 브라우저가 막지 않으므로, 모드를 고르는 클릭 안에서 바로 터뜨린다(서버 응답을 기다리지 않음)
+  const fire = (mode) => {
+    if (send({ type: 'chaos', mode })) startChaos(me()?.anon, mode);
+  };
+  if (window.SuperChaos) window.SuperChaos.choose(fire);
+  else fire('fire');
 });
 
 // ---------- 한마디 던지기 ----------
