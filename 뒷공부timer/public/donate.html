@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>캠페인 후원 · 뒷공부 근절 캠페인</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=JetBrains+Mono:wght@700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://js.tosspayments.com/v2/standard"></script>
+  </head>
+  <body>
+    <main class="donate">
+      <a class="back" id="back" href="/">← 감시 현장으로 돌아가기</a>
+
+      <div class="hero cq">
+        <div class="campaign-head">
+          <div class="campaign-title"><span class="t1">뒷공부</span><span class="t2">근절 후원</span></div>
+          <img class="campaign-sign" src="/favicon.svg" alt="뒷공부 금지" />
+        </div>
+      </div>
+
+      <div class="test-banner" id="test-banner" hidden>
+        <b>테스트 결제 모드</b> — 결제창은 실제와 똑같이 뜨지만 돈은 빠져나가지 않습니다. 운영자가 토스페이먼츠 라이브 키를
+        설정하면 실결제로 전환됩니다.
+      </div>
+
+      <!-- 결제 결과 -->
+      <section class="card result" id="result" hidden>
+        <div class="big" id="result-title"></div>
+        <p id="result-body"></p>
+        <button class="btn btn-ghost" id="result-again" type="button">후원 페이지로</button>
+      </section>
+
+      <!-- 후원 폼 -->
+      <section class="card" id="form-card">
+        <h2>감시망에 힘을 보태주세요</h2>
+        <p>후원금은 서버비와 위원회의 떡볶이값으로 투명하게(?) 쓰입니다.</p>
+        <form id="donate-form">
+          <span class="label">후원 금액</span>
+          <div class="amounts" id="amounts"></div>
+          <div class="field">
+            <input id="custom-amount" class="input" inputmode="numeric" placeholder="직접 입력 (원)" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label" for="donor-name">후원자 이름</label>
+            <input id="donor-name" class="input" maxlength="20" placeholder="익명의 후원자" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label class="label" for="donor-message">남길 한마디 (선택)</label>
+            <input id="donor-message" class="input" maxlength="60" placeholder="배신자를 꼭 잡아주세요" autocomplete="off" />
+          </div>
+          <button class="btn btn-red pay-btn" id="pay" type="submit">후원하기</button>
+          <p class="fine-print">결제는 토스페이먼츠 결제창에서 진행됩니다. 카드 정보는 이 사이트에 저장되지 않습니다.</p>
+        </form>
+      </section>
+
+      <section>
+        <h2>명예의 전당</h2>
+        <div class="raised" id="raised">0원 <small>· 0명 참여</small></div>
+        <ul class="donors" id="donors"></ul>
+      </section>
+    </main>
+
+    <div class="toasts" id="toasts"></div>
+    <script src="/donate.js" type="module"></script>
+  </body>
+</html>

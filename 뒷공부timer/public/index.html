@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>뒷공부 근절 캠페인</title>
+    <meta name="description" content="서로의 뒷공부를 감시하는 타이머. 방을 만들고 링크를 뿌리세요." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=JetBrains+Mono:wght@700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <!-- 공용 SVG 심볼 -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="no-study" viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="88" fill="#fff" stroke="#d14236" stroke-width="18" />
+        <g fill="#111">
+          <circle cx="96" cy="56" r="13" />
+          <path d="M72 122c-3-28 6-50 24-50 13 0 19 12 21 26l14 4v8l-22-3-3 15z" />
+          <rect x="52" y="120" width="102" height="9" />
+          <rect x="60" y="129" width="7" height="38" />
+          <rect x="139" y="129" width="7" height="38" />
+          <rect x="122" y="92" width="30" height="7" />
+          <rect x="125" y="102" width="30" height="7" />
+          <rect x="122" y="112" width="30" height="7" />
+        </g>
+        <line x1="38" y1="38" x2="162" y2="162" stroke="#d14236" stroke-width="18" />
+      </symbol>
+    </svg>
+
+    <!-- ===== 로비 ===== -->
+    <main id="lobby" class="lobby" hidden>
+      <div class="hero cq">
+        <div class="campaign-head">
+          <div class="campaign-title"><span class="t1">뒷공부</span><span class="t2">근절 캠페인</span></div>
+          <svg class="campaign-sign" role="img" aria-label="뒷공부 금지"><use href="#no-study" /></svg>
+        </div>
+      </div>
+
+      <section class="card">
+        <h2>우리 그룹 근절방 개설</h2>
+        <p>
+          "나 어제 공부 하나도 안 했어"라고 말하던 그 친구, 정말 안 했을까요? 방을 만들고 링크를 뿌리세요. 같은 링크로
+          들어온 사람끼리 얼굴과 뒷공부 시간을 서로 감시합니다.
+        </p>
+        <form id="create-form" class="row">
+          <input id="room-name" class="input" maxlength="30" placeholder="방 이름 (예: 중간고사 배신자 색출반)" autocomplete="off" />
+          <button class="btn btn-red" type="submit">방 만들기</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>코드로 입장</h2>
+        <form id="join-form" class="row">
+          <input id="join-code" class="input" maxlength="6" placeholder="6자리 방 코드" autocomplete="off" autocapitalize="characters" />
+          <button class="btn btn-black" type="submit">입장</button>
+        </form>
+      </section>
+
+      <p class="lobby-foot">감시에는 서버비가 듭니다 · <a href="/donate">캠페인 후원하기</a></p>
+    </main>
+
+    <!-- ===== 방 ===== -->
+    <main id="room" class="room" hidden>
+      <div class="poster-col cq">
+        <div class="poster">
+          <div class="poster-bar"></div>
+          <div class="campaign-head">
+            <div class="campaign-title"><span class="t1">뒷공부</span><span class="t2">근절 캠페인</span></div>
+            <svg class="campaign-sign" role="img" aria-label="뒷공부 금지"><use href="#no-study" /></svg>
+          </div>
+          <ul class="poster-rules">
+            <li>같이 놀았으면서 <em>몰래 공부하기</em> 금지</li>
+            <li>모두의 행복을 위한 <em>소중한 노력</em></li>
+            <li><em>공정한 경쟁</em>에 참여해주세요</li>
+          </ul>
+
+          <div class="poster-model" id="model">
+            <div class="model-empty">
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <circle cx="50" cy="36" r="20" />
+                <path d="M12 100c0-24 17-38 38-38s38 14 38 38z" />
+              </svg>
+              모델 공석
+              <small>얼굴을 헌납할 시민을 찾습니다</small>
+            </div>
+          </div>
+          <div class="model-tag" id="model-tag" hidden></div>
+
+          <svg class="poster-hand" viewBox="0 0 260 400" aria-hidden="true">
+            <g fill="#ecc7a4" stroke="#d29c7c" stroke-width="5" stroke-linejoin="round">
+              <rect x="-6" y="214" width="46" height="130" rx="23" transform="rotate(-32 17 280)" />
+              <rect x="40" y="62" width="40" height="190" rx="20" />
+              <rect x="86" y="18" width="42" height="220" rx="21" />
+              <rect x="134" y="30" width="42" height="210" rx="21" />
+              <rect x="182" y="74" width="38" height="180" rx="19" />
+              <path d="M38 200h184v110c0 60-40 96-92 96s-92-36-92-96z" />
+            </g>
+            <rect x="41" y="190" width="178" height="40" fill="#ecc7a4" />
+            <g fill="none" stroke="#d29c7c" stroke-width="4" stroke-linecap="round">
+              <path d="M82 96v110M130 70v136M178 96v112" />
+              <path d="M70 300c30 24 80 22 116-14M84 336c26 12 60 10 86-6" />
+            </g>
+          </svg>
+
+          <div class="shouts" id="shouts" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <header class="room-head">
+          <h1 id="room-title"></h1>
+          <span class="room-code" id="room-code" title="방 코드"></span>
+          <button class="btn btn-ghost" id="copy-link" type="button">초대 링크 복사</button>
+          <button class="btn btn-ghost" id="leave" type="button">나가기</button>
+          <div class="conn" id="conn" hidden>연결이 끊겼습니다. 다시 잠입하는 중…</div>
+        </header>
+
+        <section class="card card-red shout-box">
+          <h2>한마디 던지기 (포스터 위에 둥둥 떠다님)</h2>
+          <form id="shout-form" class="row">
+            <input id="shout-input" class="input" maxlength="24" placeholder="공부 그만!!" autocomplete="off" />
+            <button class="btn btn-red" type="submit">던지기</button>
+          </form>
+          <div class="chips" id="chips"></div>
+        </section>
+
+        <section class="card me-box">
+          <label class="label" for="my-name">내 닉네임</label>
+          <div class="name-row">
+            <input id="my-name" class="input" maxlength="12" autocomplete="off" />
+            <button class="btn btn-red" id="photo-btn" type="button">내 얼굴로 캠페인 모델 되기</button>
+            <input id="photo-file" type="file" accept="image/*" capture="user" hidden />
+          </div>
+          <p class="hint">얼굴만 꽉 차게 찍으면 포스터 모델이 즉시 교체됩니다. 손은 위원회가 달아드립니다. 표정은 최대한 단호하게.</p>
+
+          <label class="label" for="my-alibi">지금 뭐 하는 중? (주장)</label>
+          <input id="my-alibi" class="input alibi-input" maxlength="16" autocomplete="off" />
+
+          <span class="label">내 뒷공부 누적 형량</span>
+          <div class="my-timer" id="my-timer">00:00:00</div>
+          <div class="timer-actions">
+            <button class="btn btn-red" id="toggle-timer" type="button">책 몰래 펴기 (배신)</button>
+            <button class="btn btn-ghost" id="reset-timer" type="button">증거 인멸</button>
+          </div>
+        </section>
+
+        <section class="wanted">
+          <h2>공개 수배 명단</h2>
+          <div class="wanted-sub">감시 대상 <span id="count-all">0</span>명 · 현재 뒷공부 현행범 <b id="count-run">0명</b></div>
+          <ol class="wanted-list" id="wanted-list"></ol>
+        </section>
+
+        <div class="donate-cta">
+          <span>감시망 유지에는 서버비가 듭니다.</span>
+          <a class="btn btn-black" href="/donate">캠페인 후원하기</a>
+        </div>
+      </div>
+    </main>
+
+    <div class="busted" id="busted" role="alertdialog" aria-labelledby="busted-title" hidden>
+      <div class="busted-card">
+        <div class="busted-title" id="busted-title">검거!</div>
+        <div class="busted-count" id="busted-count"></div>
+        <p id="busted-by"></p>
+        <button class="btn btn-black" id="busted-ok" type="button">죗값을 받겠습니다</button>
+      </div>
+    </div>
+
+    <div class="toasts" id="toasts"></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "dwitgongbu-timer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "뒷공부 근절 캠페인 - 서로의 뒷공부를 감시하는 타이머",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
