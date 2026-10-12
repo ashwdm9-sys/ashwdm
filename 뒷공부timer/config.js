@@ -1,5 +1,4 @@
 // 백엔드(서버) 주소.
-// - 로컬 실행(npm start)에서는 비워두면 같은 주소의 서버를 씁니다.
-// - GitHub Pages처럼 서버가 없는 곳에 올릴 때는 배포한 서버 주소를 넣으세요.
-//   예: 'https://dwitgongbu-timer.onrender.com' (끝에 / 없이, https 필수)
-window.DGB_API_BASE = 'https://dwitgongbu-timer.onrender.com';
+// - GitHub Pages 주소에서는 Render 서버를 가리킵니다.
+// - 서버가 화면까지 같이 서빙하는 곳(Render 주소, dwitgongbu.party, 로컬 npm start)에서는 비워두면 같은 주소의 서버를 씁니다.
+window.DGB_API_BASE = location.hostname.endsWith('github.io') ? 'https://dwitgongbu-timer.onrender.com' : '';

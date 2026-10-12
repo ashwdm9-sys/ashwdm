@@ -1060,3 +1060,39 @@ h3 {
     }
   }
 }
+
+/* 소개 · 개인정보처리방침 */
+
+.doc h1 {
+  font-size: 2rem;
+}
+
+.doc .card ol,
+.doc .card ul {
+  margin: 0;
+  padding-left: 1.3em;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doc .card p + p {
+  margin-top: -6px;
+}
+
+.doc-foot,
+.doc-date {
+  text-align: center;
+  color: var(--gray);
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.doc a {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.doc .back {
+  color: var(--gray);
+}
