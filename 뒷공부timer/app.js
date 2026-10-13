@@ -1,4 +1,5 @@
 import { $, el, toast, store, api, ago, API_BASE, noBackend, wsUrl } from './common.js';
+import { renderRanking, renderBusted, renderPoster, toBlob, saveBlob } from './capture.js';
 
 const PRESETS = ['공부 그만!!', '책 덮어라', '너 지금 공부하지?', '배신자 색출 중', 'PC방 ㄱ?', '떡볶이 사라', '다 보인다', '형광펜 내려놔'];
 const DEFAULT_ALIBI = '릴스 넘기는 중';
@@ -325,6 +326,116 @@ function tick() {
 setInterval(tick, 1000);
 setInterval(() => room && renderModel(), 30_000);
 
+// ---------- 이미지로 저장 ----------
+
+let shot = null;
+
+function closeShot() {
+  if (!shot) return;
+  URL.revokeObjectURL(shot.url);
+  shot = null;
+  $('#shot-modal').hidden = true;
+  $('#shot-img').removeAttribute('src');
+}
+
+async function openShot(canvas, filename) {
+  const blob = await toBlob(canvas);
+  if (!blob) throw new Error('이미지를 만들지 못했습니다.');
+  closeShot();
+  shot = { blob, filename, url: URL.createObjectURL(blob) };
+  $('#shot-img').src = shot.url;
+  $('#shot-modal').hidden = false;
+  $('#shot-save').focus();
+}
+
+// 그리는 동안 버튼을 잠그고, 실패하면 알려준다
+async function makeShot(button, draw, filename) {
+  if (button.disabled) return;
+  const label = button.textContent;
+  button.disabled = true;
+  button.textContent = '그리는 중…';
+  try {
+    await openShot(await draw(), filename);
+  } catch (err) {
+    toast(err.message || '이미지를 만들지 못했습니다.');
+  } finally {
+    button.disabled = false;
+    button.textContent = label;
+  }
+}
+
+$('#shot-save').addEventListener('click', async () => {
+  if (!shot) return;
+  const result = await saveBlob(shot.blob, shot.filename);
+  if (result === 'downloaded') toast('이미지를 저장했습니다.');
+});
+$('#shot-close').addEventListener('click', closeShot);
+$('#shot-modal').addEventListener('click', (event) => {
+  if (event.target === $('#shot-modal')) closeShot();
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeShot();
+});
+
+$('#save-rank').addEventListener('click', () => {
+  if (!room) return;
+  const titles = ['뒷공부 왕', '뒷공부 준우승', '뒷공부 3위'];
+  const entries = sortedMembers()
+    .slice(0, 10)
+    .map((m, index) => {
+      const total = elapsedOf(m);
+      const medal = total > 0 && index < 3 ? index + 1 : 0;
+      const record = m.convictions > 0 ? `전과 ${m.convictions}범` : total > 0 ? '청정?시민' : '청정 시민';
+      return {
+        rank: index + 1,
+        medal,
+        name: m.name,
+        isMe: m.id === userId,
+        tag: m.studySince ? '📖 정정당당 앞공부 중' : medal ? `${titles[index]}${m.convictions > 0 ? ` · 전과 ${m.convictions}범` : ''}` : record,
+        time: clock(total),
+        photo: m.photoV ? photoUrl(m) : null,
+      };
+    });
+  makeShot($('#save-rank'), () => renderRanking({ roomName: room.name, entries }), `dwitgongbu-rank-${roomCode}.png`);
+});
+
+$('#save-poster').addEventListener('click', () => {
+  if (!room) return;
+  const model = room.model && room.members.find((m) => m.id === room.model.userId && m.photoV);
+  makeShot(
+    $('#save-poster'),
+    () =>
+      renderPoster({
+        model: model ? { photo: photoUrl(model), name: model.name } : null,
+        signSymbol: $('#no-study'),
+        handEl: $('.poster-hand'),
+      }),
+    `dwitgongbu-poster-${roomCode}.png`,
+  );
+});
+
+$('#busted-save').addEventListener('click', () => {
+  const mine = me();
+  if (!room || !mine || !lastBusted) return;
+  makeShot(
+    $('#busted-save'),
+    () =>
+      renderBusted({
+        name: mine.name,
+        photo: mine.photoV ? photoUrl(mine) : null,
+        convictions: lastBusted.convictions,
+        by: lastBusted.by,
+        roomName: room.name,
+      }),
+    `dwitgongbu-busted-${roomCode}.png`,
+  );
+});
+
+$('#save-chaos').addEventListener('click', () => {
+  if (!lastChaosShot) return toast('저장할 난장판이 아직 없습니다. 먼저 터뜨려 보세요.');
+  makeShot($('#save-chaos'), async () => lastChaosShot, `dwitgongbu-chaos-${roomCode}.png`);
+});
+
 // ---------- 정정당당 앞공부 ----------
 
 let renderedStudyRank = '';
@@ -477,10 +588,13 @@ function playSiren(seconds = 3) {
   osc.stop(t0 + seconds);
 }
 
+let lastBusted = null;
+
 function onBusted(msg) {
   if (msg.targetId !== userId) {
     return toast(`🚨 ${msg.name} 검거! 전과 ${msg.convictions}범`, 3500);
   }
+  lastBusted = { convictions: msg.convictions, by: msg.by };
   playSiren();
   navigator.vibrate?.([300, 100, 300, 100, 300]);
   $('#busted-count').textContent = `전과 ${msg.convictions}범`;
@@ -495,15 +609,28 @@ $('#busted-ok').addEventListener('click', () => ($('#busted').hidden = true));
 const CHAOS_COOLDOWN_MS = 10_000; // 서버와 같은 값
 let chaosAt = 0;
 
+let lastChaosShot = null;
+
 function startChaos(by, mode = 'fire') {
   chaosAt = Date.now();
-  window.SuperChaos?.run({
+  const started = window.SuperChaos?.run({
     mode,
     image: $('#model img'),
     face: $('#model'), // 싸다구에 맞고 흔들리는 포스터 모델 박스
     hand: $('.poster-hand'), // 포스터의 손이 직접 날아가 때린다
     nick: by,
+    onEnd: () => {
+      if (lastChaosShot) toast('📸 "마지막 난장판 저장"으로 이 화면을 저장할 수 있어요', 4500);
+    },
   });
+  if (!started) return;
+  // 5초짜리라 놓치기 쉬우니, 제일 정신없는 시점(2.6초)에 알아서 한 장 찍어 둔다
+  setTimeout(() => {
+    const shot = window.SuperChaos?.snapshot();
+    if (!shot) return;
+    lastChaosShot = shot;
+    $('#save-chaos').disabled = false;
+  }, 2600);
 }
 
 $('#chaos-btn').addEventListener('click', () => {

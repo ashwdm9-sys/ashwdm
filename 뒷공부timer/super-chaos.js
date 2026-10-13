@@ -60,7 +60,7 @@
   const still = global.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   const visible = (el) => !!el && el.isConnected && el.getClientRects().length > 0;
   const eyeCache = new WeakMap(); // img -> { src, pts, p }
-  let faceapiReady = null, actx = null, noise = null, running = false;
+  let faceapiReady = null, actx = null, noise = null, running = false, active = null;
 
   // ---------- CSS (한 번만 주입) ----------
   const CSS = `
@@ -271,6 +271,21 @@ html.sc-on.sc-slap body{animation:sc-shake .12s linear infinite}
     // body에 흔들기/색 회전을 거니까 레이어는 html에 붙여야 같이 안 흔들림
     document.documentElement.append(layer, fg);
 
+    // snapshot() 이 쓸 재료. 손은 SVG 라서 미리 이미지로 만들어 둔다.
+    active = { layer, cv, fcv, faceEl, hand: opt.hand || null, srcImg, mode, nick: opt.nick || "", lines: M.mega, label: M.label.replace(/^\S+\s/, ""), handImg: null };
+    if (opt.hand && opt.hand.cloneNode) {
+      try {
+        const clone = opt.hand.cloneNode(true);
+        clone.removeAttribute("class"); clone.removeAttribute("style");
+        clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        const cs = getComputedStyle(opt.hand);
+        clone.setAttribute("width", parseFloat(cs.width) || 200); clone.setAttribute("height", parseFloat(cs.height) || 300);
+        const im = new Image();
+        im.onload = () => { if (active) active.handImg = im; };
+        im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(clone));
+      } catch (_) {}
+    }
+
     const audio = opt.sound === false ? MUTE : startAudio(mode);
     if (opt.voice !== false) speak(M.voice);
     const ctx = cv.getContext("2d"), fctx = fcv.getContext("2d"), dpr = Math.min(2, global.devicePixelRatio || 1);
@@ -479,6 +494,7 @@ html.sc-on.sc-slap body{animation:sc-shake .12s linear infinite}
       cancelAnimationFrame(raf); removeEventListener("resize", size);
       layer.classList.add("sc-out"); fg.classList.add("sc-out"); setTimeout(() => { layer.remove(); fg.remove(); }, 350);
       document.documentElement.classList.remove("sc-on", "sc-slap");
+      active = null;
       if (domHand) domHand.style.transform = handPrevT;
       audio.stop(); try { speechSynthesis.cancel(); } catch (_) {}
       running = false;
@@ -619,7 +635,87 @@ html.sc-on.sc-slap body{animation:sc-shake .12s linear infinite}
     return true;
   }
 
-  const api = { run, choose, prepare, isRunning: () => running, modes: Object.keys(MODES) };
+  // ---------- 지금 화면을 이미지로 (난장판이 도는 동안만 사용 가능) ----------
+  // 효과 캔버스 + 글자들 + (효과 아래에 깔린) 모델 얼굴과 손을 합성한다. 페이지 나머지 부분은 포함하지 않는다.
+  function snapshot() {
+    if (!active) return null;
+    const { layer, cv, fcv, faceEl, hand, handImg, srcImg, mode, nick, lines, label } = active;
+    const W = innerWidth, H = innerHeight, sc = Math.min(2, global.devicePixelRatio || 1);
+    const c = document.createElement("canvas"); c.width = Math.round(W * sc); c.height = Math.round(H * sc);
+    const g = c.getContext("2d"); g.scale(sc, sc);
+
+    g.fillStyle = "#fff6e6"; g.fillRect(0, 0, W, H);
+    g.save(); g.translate(W / 2, H / 2);
+    const R = Math.hypot(W, H);
+    for (let i = 0; i < 36; i += 2) {
+      const a0 = (i / 36) * Math.PI * 2, a1 = ((i + 1) / 36) * Math.PI * 2;
+      g.fillStyle = "rgba(255,225,0,.2)"; g.beginPath(); g.moveTo(0, 0);
+      g.lineTo(Math.cos(a0) * R, Math.sin(a0) * R); g.lineTo(Math.cos(a1) * R, Math.sin(a1) * R); g.closePath(); g.fill();
+    }
+    g.restore();
+    const grad = g.createLinearGradient(0, 0, W, H);
+    ["#ff2d55", "#ff9500", "#ffcc00", "#34c759", "#00c7ff", "#af52de"].forEach((col, i, a) => grad.addColorStop(i / (a.length - 1), col));
+    g.globalAlpha = .28; g.fillStyle = grad; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+
+    const face = () => {
+      const r = visible(faceEl) ? faceEl.getBoundingClientRect() : null;
+      if (r) {
+        const rx = r.width / 2, ry = r.height * .38;
+        g.save(); g.beginPath(); g.moveTo(r.left, r.bottom); g.lineTo(r.left, r.top + ry);
+        g.ellipse(r.left + rx, r.top + ry, rx, ry, 0, Math.PI, 0); g.lineTo(r.right, r.bottom); g.closePath();
+        g.fillStyle = "#e9e5e2"; g.fill(); g.clip();
+        if (visible(srcImg)) {
+          const s = Math.max(r.width / srcImg.naturalWidth, r.height / srcImg.naturalHeight);
+          const w = srcImg.naturalWidth * s, h = srcImg.naturalHeight * s;
+          try { g.drawImage(srcImg, r.left + (r.width - w) / 2, r.top + (r.height - h) / 2, w, h); } catch (_) {}
+        }
+        g.restore();
+      }
+      if (handImg && visible(hand)) {
+        const hr = hand.getBoundingClientRect(), cs = getComputedStyle(hand);
+        const w = parseFloat(cs.width) || hr.width, h = parseFloat(cs.height) || hr.height;
+        let ang = 0; try { const m = new DOMMatrix(cs.transform); ang = Math.atan2(m.b, m.a); } catch (_) {}
+        g.save(); g.translate(hr.left + hr.width / 2, hr.top + hr.height / 2); g.rotate(ang); g.drawImage(handImg, -w / 2, -h / 2, w, h); g.restore();
+      }
+    };
+
+    if (mode === "fire") face(); // 눈빔: 얼굴이 효과 아래에 깔림
+    g.drawImage(cv, 0, 0, W, H);
+    if (mode === "slap") face(); // 싸다구: 얼굴 자리는 효과가 비켜감
+    g.drawImage(fcv, 0, 0, W, H);
+
+    const word = (txt, x, y, size, fill, stroke, lw, rot) => {
+      g.save(); g.translate(x, y); g.rotate(rot || 0);
+      g.font = `900 ${size}px "Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif`;
+      g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
+      g.lineWidth = lw; g.strokeStyle = stroke; g.strokeText(txt, 0, 0); g.fillStyle = fill; g.fillText(txt, 0, 0); g.restore();
+    };
+    layer.querySelectorAll(".sc-spam").forEach((el) => {
+      const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      word(el.textContent, r.left + r.width / 2, r.top + r.height / 2, parseFloat(cs.fontSize), cs.color, "#111", 5, (parseFloat(cs.getPropertyValue("--r")) || 0) * Math.PI / 180);
+    });
+    layer.querySelectorAll(".sc-orbit b").forEach((el) => {
+      const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      word(el.textContent, r.left + r.width / 2, r.top + r.height / 2, parseFloat(cs.fontSize), cs.color, "#111", 5);
+    });
+    const size = parseFloat(getComputedStyle(layer.querySelector(".sc-mega")).fontSize) || 100;
+    lines.forEach((t, i) => {
+      const y = H / 2 + (i - (lines.length - 1) / 2) * size * 1.05;
+      word(t, W / 2 + 6, y + 6, size, "#111", "#111", 8);
+      word(t, W / 2, y, size, "#fff", "#e0312b", 10);
+    });
+    if (nick) {
+      const txt = `${nick}님의 ${label}`; g.font = '700 22px "Noto Sans KR",sans-serif';
+      const w = g.measureText(txt).width + 28, y = H / 2 + (lines.length / 2) * size * 1.05 + 14;
+      g.fillStyle = "#111"; g.beginPath(); g.roundRect(W / 2 - w / 2, y, w, 40, 20); g.fill();
+      g.fillStyle = "#fff"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, W / 2, y + 21);
+    }
+    g.font = '700 20px "Noto Sans KR",sans-serif'; g.textAlign = "center"; g.textBaseline = "alphabetic";
+    g.fillStyle = "rgba(17,17,17,.7)"; g.fillText("뒷공부 근절 캠페인 · dwitgongbu.party", W / 2, H - 16);
+    return c;
+  }
+
+  const api = { run, choose, prepare, snapshot, isRunning: () => running, modes: Object.keys(MODES) };
   if (typeof module === "object" && module.exports) module.exports = api;
   global.SuperChaos = api;
 })(typeof window !== "undefined" ? window : globalThis);

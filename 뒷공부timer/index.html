@@ -118,6 +118,7 @@
 
           <div class="shouts" id="shouts" aria-live="polite"></div>
         </div>
+        <button class="btn btn-ghost save-btn" id="save-poster" type="button">📸 포스터 저장</button>
       </div>
 
       <div class="panel">
@@ -141,6 +142,7 @@
         <section class="chaos-box">
           <button class="chaos-btn" id="chaos-btn" type="button">🔥 슈퍼난장판 🔥</button>
           <p>눈빔 / 싸다구 중에 골라 방 전원의 화면을 5초간 폭주시킵니다. 소리 주의.</p>
+          <button class="save-chaos" id="save-chaos" type="button" disabled>📸 마지막 난장판 저장</button>
         </section>
 
         <section class="study-box">
@@ -210,7 +212,10 @@
         </section>
 
         <section class="wanted">
-          <h2>공개 수배 명단</h2>
+          <div class="wanted-head">
+            <h2>공개 수배 명단</h2>
+            <button class="btn btn-ghost save-btn" id="save-rank" type="button">📸 랭킹 저장</button>
+          </div>
           <div class="wanted-sub">감시 대상 <span id="count-all">0</span>명 · 현재 뒷공부 현행범 <b id="count-run">0명</b></div>
           <ol class="wanted-list" id="wanted-list"></ol>
         </section>
@@ -227,7 +232,19 @@
         <div class="busted-title" id="busted-title">검거!</div>
         <div class="busted-count" id="busted-count"></div>
         <p id="busted-by"></p>
+        <button class="btn btn-ghost" id="busted-save" type="button">📸 인증샷 저장</button>
         <button class="btn btn-black" id="busted-ok" type="button">죗값을 받겠습니다</button>
+      </div>
+    </div>
+
+    <div class="shot-modal" id="shot-modal" role="dialog" aria-modal="true" aria-label="이미지 저장" hidden>
+      <div class="shot-box">
+        <img id="shot-img" alt="저장할 이미지" />
+        <p class="shot-hint">모바일에서는 이미지를 꾹 눌러도 저장됩니다.</p>
+        <div class="shot-actions">
+          <button class="btn btn-red" id="shot-save" type="button">저장 / 공유</button>
+          <button class="btn btn-ghost" id="shot-close" type="button">닫기</button>
+        </div>
       </div>
     </div>
 
