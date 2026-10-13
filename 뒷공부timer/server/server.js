@@ -89,6 +89,12 @@ function elapsedOf(member, now = Date.now()) {
   return member.accumMs + (member.runningSince ? now - member.runningSince : 0);
 }
 
+function stopStudy(member, now = Date.now()) {
+  if (!member.studySince) return;
+  member.studyAccumMs = (member.studyAccumMs || 0) + (now - member.studySince);
+  member.studySince = null;
+}
+
 function publicRoom(room) {
   return {
     code: room.code,
@@ -102,6 +108,10 @@ function publicRoom(room) {
       runningSince: m.runningSince,
       convictions: m.convictions,
       alibi: m.alibi || '',
+      studyAccumMs: m.studyAccumMs || 0,
+      studySince: m.studySince || null,
+      place: m.place || '',
+      subject: m.subject || '',
       photoV: m.photo ? m.photoV : 0,
       online: (sockets.get(room.code + ':' + m.id)?.size || 0) > 0,
     })),
@@ -288,7 +298,7 @@ const CHAOS_COOLDOWN_MS = 10_000;
 const chaosAt = new Map();
 
 // 메시지 종류별 최소 간격(ms)
-const THROTTLE = { shout: 700, report: 250, photo: 3000, rename: 300, alibi: 300, timer: 200 };
+const THROTTLE = { shout: 700, report: 250, photo: 3000, rename: 300, alibi: 300, timer: 200, study: 300, gather: 4000 };
 
 const handlers = {
   rename(ws, room, me, msg) {
@@ -318,9 +328,41 @@ const handlers = {
     broadcastState(room);
   },
 
+  // 정정당당 앞공부: 고발 없이 공부한 시간만 쌓는 타이머. 장소와 과목이 방 전원에게 보인다.
+  study(ws, room, me, msg) {
+    const now = Date.now();
+    const place = cleanText(msg.place, 20);
+    const subject = cleanText(msg.subject, 20);
+    if (msg.action === 'start' && !me.studySince) {
+      if (me.runningSince) { // 뒷공부 중이었다면 자수가 아니라 그냥 멈춘다 (전과 없음)
+        me.accumMs = elapsedOf(me, now);
+        me.runningSince = null;
+      }
+      me.place = place || '어딘가';
+      me.subject = subject || '자습';
+      me.studySince = now;
+      broadcast(room, { type: 'studynote', name: me.name, place: me.place, subject: me.subject });
+    } else if (msg.action === 'stop' && me.studySince) {
+      stopStudy(me, now);
+    } else if (msg.action === 'update') {
+      if (place) me.place = place;
+      if (subject) me.subject = subject;
+    } else {
+      return;
+    }
+    broadcastState(room);
+  },
+
+  // 다들 어디야? — 방 전원에게 같이 앞공부하자고 외친다
+  gather(ws, room, me, msg) {
+    const place = cleanText(msg.place, 20);
+    broadcast(room, { type: 'gather', name: me.name, place });
+  },
+
   timer(ws, room, me, msg) {
     const now = Date.now();
     if (msg.action === 'start' && !me.runningSince) {
+      stopStudy(me, now); // 앞공부와 뒷공부를 동시에 할 수는 없다
       me.runningSince = now;
     } else if (msg.action === 'stop' && me.runningSince) {
       me.accumMs = elapsedOf(me, now);
@@ -449,6 +491,10 @@ function join(ws, msg) {
       runningSince: null,
       convictions: 0,
       alibi: cleanText(msg.alibi, 16),
+      studyAccumMs: 0,
+      studySince: null,
+      place: '',
+      subject: '',
       photo: null,
       photoV: 0,
       joinedAt: Date.now(),

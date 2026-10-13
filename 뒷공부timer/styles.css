@@ -1096,3 +1096,177 @@ h3 {
 .doc .back {
   color: var(--gray);
 }
+
+/* 정정당당 앞공부 */
+
+.btn-green {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.btn-green:hover:not(:disabled) {
+  background: #247040;
+  border-color: #247040;
+}
+
+.btn-green.on {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.study-box {
+  border-radius: 24px;
+  padding: 18px 20px 14px;
+  text-align: center;
+  background: linear-gradient(120deg, #1e9e57, #7ad66b, #c8f08a, #7ad66b, #1e9e57);
+  background-size: 300% 300%;
+  animation: chaos-bg 5s linear infinite;
+}
+
+.study-box p {
+  margin: 8px 0 0;
+  color: #0f3d22;
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.study-btn {
+  width: 100%;
+  border: 4px solid var(--ink);
+  border-radius: 16px;
+  background: #fff;
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 4.6vw, 2rem);
+  padding: 0.35em 0.5em;
+  box-shadow: 0 6px 0 var(--ink);
+}
+
+.study-btn:hover {
+  background: #eaffd8;
+}
+
+.study-btn:active {
+  translate: 0 6px;
+  box-shadow: none;
+}
+
+.card-green {
+  border-color: var(--green);
+  background: #f1faf3;
+}
+
+.study-intro {
+  font-size: 0.93rem;
+}
+
+.study-form .field {
+  margin-bottom: 14px;
+}
+
+.study-timer {
+  color: var(--green);
+}
+
+.study-h {
+  font-size: 1.15rem;
+  margin: 26px 0 10px;
+}
+
+.study-board {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.study-empty {
+  color: #4b5b50;
+  margin: 0;
+}
+
+.study-place {
+  background: #fff;
+  border: 2px solid var(--green);
+  border-radius: 16px;
+  padding: 10px 14px;
+}
+
+.study-place-head {
+  font-family: var(--display);
+  font-size: 1.1rem;
+  color: var(--green);
+  overflow-wrap: anywhere;
+}
+
+.study-place ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.study-place li,
+.study-rank li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.study-who {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.study-who b {
+  font-family: var(--display);
+  font-weight: 400;
+}
+
+.study-who span {
+  color: #4b5b50;
+}
+
+.study-rank {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 3px solid var(--ink);
+}
+
+.study-rank li {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 4px;
+}
+
+.study-rank .rank {
+  width: 1.6em;
+  flex: none;
+}
+
+.study-rank .study-who {
+  flex: 1;
+}
+
+.study-time {
+  font-family: var(--mono);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wanted-item.studying {
+  background: #eaf7ee;
+}
+
+.badge.good {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-box {
+    animation: none;
+  }
+}

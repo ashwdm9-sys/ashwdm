@@ -106,12 +106,7 @@ $('#join-form').addEventListener('submit', async (event) => {
 
 window.addEventListener('popstate', () => {
   disconnect();
-  if (noBackend) {
-  showLobby();
-  toast('서버 주소가 설정되지 않았습니다. config.js 를 확인하세요.', 8000);
-} else {
   route();
-}
 });
 
 // ---------- 실시간 연결 ----------
@@ -137,6 +132,10 @@ function connect() {
       renderRoom();
     } else if (msg.type === 'shout') {
       addShout(msg);
+    } else if (msg.type === 'studynote') {
+      toast(`📖 ${msg.name}님이 ${msg.place}에서 ${msg.subject} 앞공부 시작!`, 3500);
+    } else if (msg.type === 'gather') {
+      onGather(msg);
     } else if (msg.type === 'chaos') {
       startChaos(msg.by, msg.mode);
     } else if (msg.type === 'busted') {
@@ -176,6 +175,7 @@ function send(msg) {
 // ---------- 방 렌더링 ----------
 
 const me = () => room?.members.find((m) => m.id === userId);
+const studyElapsedOf = (m) => (m.studyAccumMs || 0) + (m.studySince ? Math.max(0, serverNow() - m.studySince) : 0);
 const photoUrl = (m) => `${API_BASE}/api/rooms/${room.code}/photo/${encodeURIComponent(m.id)}?v=${m.photoV}`;
 const sortedMembers = () => [...room.members].sort((a, b) => elapsedOf(b) - elapsedOf(a) || a.name.localeCompare(b.name, 'ko'));
 
@@ -197,6 +197,7 @@ function renderRoom() {
 
   renderModel();
   renderList();
+  renderStudy();
   tick();
 }
 
@@ -236,19 +237,26 @@ function renderList() {
     ...members.map((m, index) => {
       const isMe = m.id === userId;
       const running = !!m.runningSince;
+      const studying = !!m.studySince;
       const total = elapsedOf(m);
-      const badge = running
-        ? el('span', { class: 'badge bad' }, '현행범')
-        : m.convictions > 0
+      const badge = studying
+        ? el('span', { class: 'badge good' }, '정정당당')
+        : running
+          ? el('span', { class: 'badge bad' }, '현행범')
+          : m.convictions > 0
           ? el('span', { class: 'badge warn' }, `전과 ${m.convictions}범`)
           : total > 0
             ? el('span', { class: 'badge warn' }, '청정?시민')
             : el('span', { class: 'badge' }, '청정 시민');
-      const status = running ? '뒷공부 중 (현장 적발 가능!)' : `${m.alibi || DEFAULT_ALIBI} (주장)${m.online ? '' : ' · 잠적'}`;
+      const status = studying
+        ? `📖 앞공부 중 · ${m.place} · ${m.subject}`
+        : running
+          ? '뒷공부 중 (현장 적발 가능!)'
+          : `${m.alibi || DEFAULT_ALIBI} (주장)${m.online ? '' : ' · 잠적'}`;
 
       return el(
         'li',
-        { class: `wanted-item${running ? ' running' : ''}${m.online ? '' : ' offline'}` },
+        { class: `wanted-item${running ? ' running' : ''}${studying ? ' studying' : ''}${m.online ? '' : ' offline'}` },
         el('span', { class: 'rank' }, String(index + 1)),
         m.photoV
           ? el('img', { class: 'avatar', src: photoUrl(m), alt: '' })
@@ -290,7 +298,17 @@ function renderList() {
 function tick() {
   if (!room) return;
   const mine = me();
-  if (mine) $('#my-timer').textContent = clock(elapsedOf(mine));
+  if (mine) {
+    $('#my-timer').textContent = clock(elapsedOf(mine));
+    $('#study-timer').textContent = clock(studyElapsedOf(mine));
+  }
+  if (studyRankOrder() !== renderedStudyRank) renderStudy();
+  for (const m of room.members) {
+    if (!m.studySince) continue;
+    for (const node of document.querySelectorAll(`[data-study-time-of="${CSS.escape(m.id)}"]`)) {
+      node.textContent = clock(studyElapsedOf(m));
+    }
+  }
 
   if (sortedMembers().map((m) => m.id).join(',') !== renderedOrder) return renderList();
   for (const m of room.members) {
@@ -302,6 +320,128 @@ function tick() {
 
 setInterval(tick, 1000);
 setInterval(() => room && renderModel(), 30_000);
+
+// ---------- 정정당당 앞공부 ----------
+
+let renderedStudyRank = '';
+const studyRanked = () =>
+  room.members
+    .filter((m) => studyElapsedOf(m) > 0)
+    .sort((a, b) => studyElapsedOf(b) - studyElapsedOf(a) || a.name.localeCompare(b.name, 'ko'));
+const studyRankOrder = () => (room ? studyRanked().map((m) => m.id).join(',') : '');
+
+function renderStudy() {
+  const mine = me();
+  const studying = !!mine?.studySince;
+  const toggle = $('#study-toggle');
+  toggle.textContent = studying ? '앞공부 끝 (수고했어요)' : '앞공부 시작 (정정당당)';
+  toggle.classList.toggle('on', studying);
+
+  const placeInput = $('#study-place');
+  const subjectInput = $('#study-subject');
+  if (studying) {
+    if (document.activeElement !== placeInput) placeInput.value = mine.place;
+    if (document.activeElement !== subjectInput) subjectInput.value = mine.subject;
+  } else {
+    if (!placeInput.value && document.activeElement !== placeInput) placeInput.value = store.get('dgb:place') || '';
+    if (!subjectInput.value && document.activeElement !== subjectInput) subjectInput.value = store.get('dgb:subject') || '';
+  }
+
+  // 지금 앞공부 중인 사람을 장소별로 묶어서 "누가 어디서 무슨 과목" 을 보여준다
+  const now = room.members.filter((m) => m.studySince);
+  $('#study-sub').textContent = now.length ? `지금 ${now.length}명이 앞공부 중! 같이 해요` : '다들 어디야? 만나서 앞공부 하자!';
+  const places = new Map();
+  for (const m of now) places.set(m.place, [...(places.get(m.place) || []), m]);
+  $('#study-board').replaceChildren(
+    ...(now.length
+      ? [...places].map(([place, people]) =>
+          el(
+            'div',
+            { class: 'study-place' },
+            el('div', { class: 'study-place-head' }, `📍 ${place} (${people.length}명)`),
+            el(
+              'ul',
+              {},
+              ...people.map((m) =>
+                el(
+                  'li',
+                  {},
+                  el('span', { class: 'study-who' }, el('b', {}, m.name), m.id === userId ? ' (나)' : '', el('span', {}, ` · ${m.subject} 공부중!`)),
+                  el('span', { class: 'study-time', dataset: { studyTimeOf: m.id } }, clock(studyElapsedOf(m))),
+                ),
+              ),
+            ),
+          ),
+        )
+      : [el('p', { class: 'study-empty' }, '아직 아무도 앞공부 중이 아닙니다. 첫 번째 정정당당 시민이 되어주세요.')]),
+  );
+
+  const ranked = studyRanked();
+  renderedStudyRank = ranked.map((m) => m.id).join(',');
+  $('#study-rank').replaceChildren(
+    ...ranked.map((m, i) =>
+      el(
+        'li',
+        {},
+        el('span', { class: 'rank' }, String(i + 1)),
+        el('span', { class: 'study-who' }, el('b', {}, m.name), m.studySince ? el('span', {}, ` · 📍${m.place} · ${m.subject}`) : ''),
+        el('span', { class: 'study-time', dataset: { studyTimeOf: m.id } }, clock(studyElapsedOf(m))),
+      ),
+    ),
+  );
+}
+
+$('#study-btn').addEventListener('click', () => {
+  const panel = $('#study-panel');
+  panel.hidden = !panel.hidden;
+  $('#study-btn').setAttribute('aria-expanded', String(!panel.hidden));
+  if (!panel.hidden) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+$('#study-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (me()?.studySince) return send({ type: 'study', action: 'stop' });
+  const place = $('#study-place').value.trim();
+  const subject = $('#study-subject').value.trim();
+  if (!place || !subject) return toast('어디서 무슨 과목을 공부하는지 적어주세요.');
+  store.set('dgb:place', place);
+  store.set('dgb:subject', subject);
+  send({ type: 'study', action: 'start', place, subject });
+});
+
+// 공부 중에 장소나 과목을 바꾸면 바로 반영한다
+let studyEditTimer = null;
+for (const input of [$('#study-place'), $('#study-subject')]) {
+  input.addEventListener('input', () => {
+    clearTimeout(studyEditTimer);
+    studyEditTimer = setTimeout(() => {
+      const place = $('#study-place').value.trim();
+      const subject = $('#study-subject').value.trim();
+      store.set('dgb:place', place);
+      store.set('dgb:subject', subject);
+      if (me()?.studySince && place && subject) send({ type: 'study', action: 'update', place, subject });
+    }, 600);
+  });
+}
+
+let gatherAt = 0;
+$('#gather-btn').addEventListener('click', () => {
+  if (Date.now() - gatherAt < 4000) return toast('잠깐만요, 방금 외쳤습니다.');
+  if (send({ type: 'gather', place: $('#study-place').value.trim() })) gatherAt = Date.now();
+});
+
+function onGather(msg) {
+  const where = msg.place ? `${msg.place}에서 ` : '';
+  toast(`📣 ${msg.name}님: 다들 어디야? ${where}만나서 앞공부 하자!`, 5000);
+  addShout({
+    text: msg.place ? `${msg.place}에서 앞공부 ㄱ?` : '다들 어디야? 앞공부 ㄱ?',
+    anon: msg.name,
+    x: 6 + Math.random() * 58,
+    y: 22 + Math.random() * 62,
+    rot: Math.round(Math.random() * 16 - 8),
+    red: false,
+  });
+}
 
 // ---------- 검거 (고발당함) ----------
 
