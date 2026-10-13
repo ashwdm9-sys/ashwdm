@@ -4,6 +4,7 @@ const http = require('http');
 const crypto = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
+const { renderOg, PHRASES } = require('./og');
 
 try {
   process.loadEnvFile(path.join(__dirname, '.env'));
@@ -262,9 +263,86 @@ app.post('/api/donations/confirm', async (req, res) => {
   }
 });
 
+// ---------- 링크 미리보기 (Open Graph) ----------
+// 카카오톡 같은 곳의 크롤러는 JavaScript 를 실행하지 않고 HTML 의 메타 태그만 읽는다.
+// 그래서 서버가 방마다 다른 제목/설명/이미지를 index.html 에 직접 끼워 넣는다.
+
+app.set('trust proxy', 1);
+const SITE_DIR = path.join(__dirname, '..');
+const OG_BLOCK = /<!-- og:start -->[\s\S]*?<!-- og:end -->/;
+let ogTurn = 0; // 요청마다 0 → 1 → 2 로 멘트를 번갈아 쓴다
+const ogCache = new Map();
+
+const escapeHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const modelOf = (room) => {
+  const m = room?.model && room.members[room.model.userId];
+  return m?.photo ? m : null;
+};
+
+app.get('/og/:name.png', async (req, res) => {
+  const room = rooms[normalizeCode(req.params.name)];
+  const idx = Math.abs(parseInt(req.query.m, 10) || 0) % PHRASES.length;
+  const model = modelOf(room);
+  const key = [room?.code || '-', idx, model?.photoV || 0, model?.eyes ? 1 : 0, room?.name || ''].join('|');
+  let png = ogCache.get(key);
+  if (!png) {
+    try {
+      png = await renderOg({
+        phraseIndex: idx,
+        roomName: room?.name || '',
+        photo: model ? Buffer.from(model.photo.split(',')[1], 'base64') : null,
+        eyes: model?.eyes || null,
+      });
+    } catch (err) {
+      console.error('미리보기 이미지 생성 실패:', err.message);
+      return res.status(500).end();
+    }
+    ogCache.set(key, png);
+    if (ogCache.size > 60) ogCache.delete(ogCache.keys().next().value);
+  }
+  res.set('Content-Type', 'image/png');
+  res.set('Cache-Control', 'public, max-age=300');
+  res.send(png);
+});
+
+app.get(['/', '/index.html'], async (req, res, next) => {
+  try {
+    const html = await fs.promises.readFile(path.join(SITE_DIR, 'index.html'), 'utf8');
+    if (!OG_BLOCK.test(html)) return next();
+    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const room = rooms[normalizeCode(req.query.room)];
+    const idx = ogTurn++ % PHRASES.length;
+    const title = PHRASES[idx].text;
+    const description = room
+      ? `"${room.name}" 방 · ${Object.keys(room.members).length}명이 서로의 뒷공부를 감시 중! 눌러서 입장하세요.`
+      : '서로의 뒷공부를 감시하는 타이머. 방을 만들고 링크를 뿌리세요.';
+    const image = `${base}/og/${room ? room.code : 'default'}.png?m=${idx}&v=${modelOf(room)?.photoV || 0}`;
+    const url = room ? `${base}/?room=${room.code}` : `${base}/`;
+    const tags = [
+      '<!-- og:start -->',
+      '<meta property="og:type" content="website" />',
+      '<meta property="og:site_name" content="뒷공부 근절 캠페인" />',
+      `<meta property="og:url" content="${escapeHtml(url)}" />`,
+      `<meta property="og:title" content="${escapeHtml(title)}" />`,
+      `<meta property="og:description" content="${escapeHtml(description)}" />`,
+      `<meta property="og:image" content="${escapeHtml(image)}" />`,
+      '<meta property="og:image:width" content="1200" />',
+      '<meta property="og:image:height" content="630" />',
+      '<meta name="twitter:card" content="summary_large_image" />',
+      `<meta name="twitter:title" content="${escapeHtml(title)}" />`,
+      `<meta name="twitter:description" content="${escapeHtml(description)}" />`,
+      `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
+      '<!-- og:end -->',
+    ].join('\n    ');
+    res.set('Cache-Control', 'no-cache');
+    res.type('html').send(html.replace(OG_BLOCK, () => tags));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // 로컬 실행용: 상위 폴더의 화면 파일을 같이 서빙한다. 서버 소스와 데이터는 노출하지 않는다.
 // (GitHub Pages에 화면을 올린 경우에는 쓰이지 않는다)
-const SITE_DIR = path.join(__dirname, '..');
 app.use('/server', (req, res) => res.status(404).end());
 app.use(express.static(SITE_DIR));
 
@@ -298,7 +376,7 @@ const CHAOS_COOLDOWN_MS = 10_000;
 const chaosAt = new Map();
 
 // 메시지 종류별 최소 간격(ms)
-const THROTTLE = { shout: 700, report: 250, photo: 3000, rename: 300, alibi: 300, timer: 200, study: 300, gather: 4000 };
+const THROTTLE = { shout: 700, report: 250, photo: 3000, rename: 300, alibi: 300, eyes: 1000, timer: 200, study: 300, gather: 4000 };
 
 const handlers = {
   rename(ws, room, me, msg) {
@@ -323,6 +401,7 @@ const handlers = {
       return send(ws, { type: 'error', message: '사진을 처리하지 못했습니다. 다른 사진으로 시도하세요.' });
     }
     me.photo = photo;
+    me.eyes = null; // 새 사진의 눈 위치는 곧이어 'eyes' 메시지로 온다
     me.photoV = Date.now();
     room.model = { userId: me.id, name: me.name, at: me.photoV };
     broadcastState(room);
@@ -357,6 +436,19 @@ const handlers = {
   gather(ws, room, me, msg) {
     const place = cleanText(msg.place, 20);
     broadcast(room, { type: 'gather', name: me.name, place });
+  },
+
+  // 업로드한 얼굴 사진에서 클라이언트가 찾은 눈 위치 (링크 미리보기의 레이저 위치에 쓴다)
+  eyes(ws, room, me, msg) {
+    const e = msg.eyes;
+    const ok =
+      Array.isArray(e) &&
+      e.length === 2 &&
+      e.every((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
+    if (!ok || !me.photo) return;
+    me.eyes = e.map((p) => ({ x: p.x, y: p.y }));
+    room.touchedAt = Date.now();
+    saveDb();
   },
 
   timer(ws, room, me, msg) {

@@ -231,6 +231,8 @@ function renderList() {
   const members = sortedMembers();
   renderedOrder = members.map((m) => m.id).join(',');
   $('#count-all').textContent = members.length;
+  const myIndex = members.findIndex((m) => m.id === userId);
+  $('#my-rank').textContent = myIndex >= 0 && elapsedOf(members[myIndex]) > 0 ? ` · 현재 뒷공부 ${myIndex + 1}위` : '';
   $('#count-run').textContent = members.filter((m) => m.runningSince).length + '명';
 
   $('#wanted-list').replaceChildren(
@@ -248,6 +250,7 @@ function renderList() {
           : total > 0
             ? el('span', { class: 'badge warn' }, '청정?시민')
             : el('span', { class: 'badge' }, '청정 시민');
+      const medal = total > 0 && index < 3 ? index + 1 : 0; // 뒷공부 시간이 있는 상위 3명만 메달
       const status = studying
         ? `📖 앞공부 중 · ${m.place} · ${m.subject}`
         : running
@@ -256,8 +259,8 @@ function renderList() {
 
       return el(
         'li',
-        { class: `wanted-item${running ? ' running' : ''}${studying ? ' studying' : ''}${m.online ? '' : ' offline'}` },
-        el('span', { class: 'rank' }, String(index + 1)),
+        { class: `wanted-item${running ? ' running' : ''}${studying ? ' studying' : ''}${medal ? ` medal-${medal}` : ''}${m.online ? '' : ' offline'}` },
+        el('span', { class: 'rank' }, medal ? ['👑', '🥈', '🥉'][index] : String(index + 1)),
         m.photoV
           ? el('img', { class: 'avatar', src: photoUrl(m), alt: '' })
           : el('span', { class: 'avatar' }, [...m.name][0] || '?'),
@@ -270,6 +273,7 @@ function renderList() {
             el('span', { class: 'who-name' }, m.name),
             isMe && el('span', { class: 'who-me' }, '(나)'),
             badge,
+            medal ? el('span', { class: 'badge crown' }, ['뒷공부 왕', '뒷공부 준우승', '뒷공부 3위'][index]) : null,
           ),
           el('span', { class: 'alibi' }, status),
         ),
@@ -582,11 +586,27 @@ $('#photo-file').addEventListener('change', async (event) => {
   if (!file) return;
   try {
     const dataUrl = await toPortraitJpeg(file);
-    if (send({ type: 'photo', dataUrl })) toast('캠페인 모델로 위촉되셨습니다.');
+    if (send({ type: 'photo', dataUrl })) {
+      toast('캠페인 모델로 위촉되셨습니다.');
+      sendEyes(dataUrl); // 링크 미리보기의 레이저를 눈에 맞추기 위해 눈 위치를 따로 알려준다
+    }
   } catch {
     toast('사진을 읽지 못했습니다. 다른 사진으로 시도하세요.');
   }
 });
+
+// 얼굴 인식은 시간이 걸릴 수 있어서 사진을 먼저 올리고, 눈 위치는 찾는 대로 뒤따라 보낸다
+async function sendEyes(dataUrl) {
+  try {
+    const img = new Image();
+    img.src = dataUrl;
+    await img.decode();
+    const eyes = await Promise.race([window.SuperChaos?.prepare(img), new Promise((resolve) => setTimeout(resolve, 8000))]);
+    if (Array.isArray(eyes) && eyes.length === 2) send({ type: 'eyes', eyes: eyes.map((p) => ({ x: p.x, y: p.y })) });
+  } catch {
+    // 못 찾으면 서버가 기본 눈 위치로 그린다
+  }
+}
 
 // 가운데를 3:4 로 잘라 480x640 JPEG 로 줄인다 (서버 전송량 절약)
 async function toPortraitJpeg(file) {
@@ -622,7 +642,10 @@ $('#wanted-list').addEventListener('click', (event) => {
 // ---------- 방 헤더 ----------
 
 $('#copy-link').addEventListener('click', async () => {
-  const link = `${location.origin}${location.pathname}?room=${roomCode}`;
+  // 링크 미리보기는 서버가 만들어 주므로, 서버가 화면을 서빙하는 주소로 공유한다 (GitHub Pages 에서 복사해도 동일)
+  const shareBase = String(window.DGB_SHARE_BASE || '').replace(/\/+$/, '');
+  const base = shareBase || location.origin + location.pathname.replace(/[^/]*$/, '').replace(/\/+$/, '');
+  const link = `${base}/?room=${roomCode}`;
   try {
     await navigator.clipboard.writeText(link);
     toast('초대 링크를 복사했습니다. 용의자에게 뿌리세요.');
